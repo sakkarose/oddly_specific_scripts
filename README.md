@@ -9,4 +9,5 @@ Personal scripts that I created for my personal uses
 * **BLE-deauth.py** - (**Python**): A simple single-address BLE deauth using bleak.
 * **everySingleImage.pl** - (**Squid**): A script that replaces every image (maybe) on a website.
 * **rewriteURL.pl** - (**Squid**): A script that replaces the url with a preset one.
+* **nessus_trial_reset.py** - (**Python**): A script to do an update on both trial and database. Credit to [Harsh Dhamaniya](https://github.com/harshdhamaniya/nessuskeygen) for their POST request to get a new trial code.
 
