@@ -106,6 +106,7 @@ def main():
     nessus_dir = r"C:\ProgramData\Tenable\Nessus"
     plugin_dir = os.path.join(nessus_dir, "nessus", "plugins")
     plugin_info_file = os.path.join(nessus_dir, "nessus", "plugin_feed_info.inc")
+    plugin_dir_info_file = os.path.join(plugin_dir, "plugin_feed_info.inc")
     
 
     commands = [
@@ -126,7 +127,7 @@ def main():
     replace_lines(plugin_info_file, replacement_lines)
 
     commands = [
-        f'move /Y "{plugin_info_file}" "{nessus_dir}\\nessus"',
+        f'move /Y "{plugin_dir_info_file}" "{nessus_dir}\\nessus"',
         f'attrib +s +r +h "{plugin_dir}\\*"',
         f'attrib +s +r +h "{plugin_info_file}"',
         'net start "Tenable Nessus"'
