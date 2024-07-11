@@ -104,7 +104,7 @@ def main():
     plugin_info_file = os.path.join(nessus_dir, "nessus", "plugin_feed_info.inc")
     plugin_dir_info_file = os.path.join(plugin_dir, "plugin_feed_info.inc")
 
-    download_path = r"C:\Users\Administrator\Download"
+    download_path = r"C:\Users\Administrator\Downloads"
     download_plugin = os.path.join(download_path, "all-2.0.tar.gz")
 
     www_dir = os.path.join(nessus_dir, "nessus", "www")
