@@ -17,7 +17,6 @@ def get_mail():
     domain = ''.join(random.choices(string.ascii_uppercase + string.digits, k=S))
     extension = E[random.randint(0, 9)]
     mail_id = name + "@" + domain + extension
-    print(mail_id)
     return mail_id
 
 def generate_nessus_pro():
