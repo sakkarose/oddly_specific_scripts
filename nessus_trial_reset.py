@@ -100,6 +100,20 @@ def write_plugin_info(version):
         file.write('\n'.join(lines))
     
 def main():
+    nessus_dir = r"C:\ProgramData\Tenable\Nessus"
+    plugin_dir = os.path.join(nessus_dir, "nessus", "plugins")
+    plugin_info_file = os.path.join(nessus_dir, "nessus", "plugin_feed_info.inc")
+    plugin_dir_info_file = os.path.join(plugin_dir, "plugin_feed_info.inc")
+
+    download_path = r"C:\Users\Administrator\Download"
+    download_plugin = os.path.join(download_path, "all-2.0.tar.gz")
+
+    www_dir = os.path.join(nessus_dir, "nessus", "www")
+    email_logo = os.path.join(www_dir, "nessus-email-logo-6.gif")
+    report_logo = os.path.join(www_dir, "nessus-report-logo-6.png")
+    bk_email_logo = os.path.join(download_path, "nessus-email-logo-6.gif")
+    bk_report_logo = os.path.join(download_path, "nessus-report-logo-6.png")
+
     version = run_cmd("curl -s -k  https://plugins.nessus.org/v2/plugins.php")
     activation_code = generate_nessus_pro()
 
@@ -107,20 +121,16 @@ def main():
         run_as_admin()
         return
 
-    nessus_dir = r"C:\ProgramData\Tenable\Nessus"
-    plugin_dir = os.path.join(nessus_dir, "nessus", "plugins")
-    plugin_info_file = os.path.join(nessus_dir, "nessus", "plugin_feed_info.inc")
-    plugin_dir_info_file = os.path.join(plugin_dir, "plugin_feed_info.inc")
-    download_path = r"C:\Users\Administrator\Download\all-2.0.tar.gz"
-
     commands = [
         'net stop "Tenable Nessus"',
+	f'attrib -r "{email_logo}"',
+	f'attrib -r "{report_logo}"',
         f'attrib -s -r -h "{plugin_dir}\\*.*"',
         f'attrib -s -r -h "{plugin_info_file}"',
         f'nessuscli fetch --register "{activation_code}"',
-        f'del "{download_path}"',
-        f'curl -o "{download_path}" "https://plugins.nessus.org/v2/nessus.php?f=all-2.0.tar.gz&u=56b33ade57c60a01058b1506999a2431&p=1ee9c89d5379a119a56498f2d5dff674"',
-        f'nessuscli update "{download_path}"'
+        f'del "{download_plugin}"',
+        f'curl -o "{download_plugin}" "https://plugins.nessus.org/v2/nessus.php?f=all-2.0.tar.gz&u=56b33ade57c60a01058b1506999a2431&p=1ee9c89d5379a119a56498f2d5dff674"',
+        f'nessuscli update "{download_plugin}"'
     ]
 
     for cmd in commands:
@@ -130,8 +140,12 @@ def main():
 
     commands = [
         f'move /Y "{plugin_dir_info_file}" "{nessus_dir}\\nessus"',
+	f'move /Y "bk_email_logo" "email_logo"',
+	f'move /Y "bk_report_logo" "report_logo"',
         f'attrib +s +r +h "{plugin_dir}\\*"',
         f'attrib +s +r +h "{plugin_info_file}"',
+        f'attrib +r "{email_logo}"',
+	f'attrib +r "{report_logo}"',
         'net start "Tenable Nessus"'
     ]
 
