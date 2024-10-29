@@ -1,5 +1,5 @@
 # oddly_specific_scripts
-Personal scripts that I created for my personal uses
+Personal scripts that I created for my unnecessary personal uses
 
 **Scripts List**
 
