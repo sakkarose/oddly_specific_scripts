@@ -10,4 +10,5 @@ Personal scripts that I created for my personal uses
 * **everySingleImage.pl** - (**Squid**): A script that replaces every image (maybe) on a website.
 * **rewriteURL.pl** - (**Squid**): A script that replaces the url with a preset one.
 * **nessus_trial_reset.py** - (**Python**): A script to do an update on both trial and database. Credit to [Harsh Dhamaniya](https://github.com/harshdhamaniya/nessuskeygen) for their POST request to get a new trial code.
+* **subfolder_index.ps1** - (**PowerShell**): This script will print only the subfolders (level 3) of every subfolders (level 2) in the current directory.
 
