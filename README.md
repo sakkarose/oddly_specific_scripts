@@ -11,5 +11,4 @@ Personal scripts that I created for my unnecessary personal uses
 * **rewriteURL.pl** - (**Squid**): A script that replaces the url with a preset one.
 * **nessus_trial_reset.py** - (**Python**): A script to do an update on both trial and database. Credit to [Harsh Dhamaniya](https://github.com/harshdhamaniya/nessuskeygen) for their POST request to get a new trial code.
 * **subfolder_index.ps1** - (**PowerShell**): This script will sort, print and write only the subfolders (level 3) of every subfolders (level 2) in the current directory.
-* **kvm_snapshot-all.sh** & **kvm_single-snapshot-restore.sh** - (**Shell**): Both scripts aim to do backup & restore on KVM. First one will backup every VM on a KVM host, the second one will do backup/restore on a single input VM.
 
