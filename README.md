@@ -11,4 +11,5 @@ Personal scripts that I created for my unnecessary personal uses
 * **rewriteURL.pl** - (**Squid**): A script that replaces the url with a preset one.
 * **nessus_trial_reset.py** - (**Python**): A script to do an update on both trial and database. Credit to [Harsh Dhamaniya](https://github.com/harshdhamaniya/nessuskeygen) for their POST request to get a new trial code.
 * **subfolder_index.ps1** - (**PowerShell**): This script will sort, print and write only the subfolders (level 3) of every subfolders (level 2) in the current directory.
+* **virtnbdbackup-alldomain.sh** - (**Shell**): Using virtnbdbackup to backup (full/incremental) all domains of the host. Additionally, it will dump backup info and verify the backup. If there is any problem with backup job or verification, it will send a notification to Uptime Kuma.
 
