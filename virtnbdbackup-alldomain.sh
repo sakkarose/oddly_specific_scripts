@@ -2,7 +2,7 @@
 
 ROOT_DIR='/home/backup-str'
 LOG_DIR="$ROOT_DIR/log"
-UPTIME_KUMA_URL='' 
+UPTIME_KUMA_URL='https://uptime.mizu.reisen/api/push/Y80kVEn7Os' 
 
 get_week_number() {
     local date="$1"
@@ -18,13 +18,13 @@ DOMAINS=$(virsh list --all --name)
 for DOMAIN in $DOMAINS; do
     DESTINATION_DIR="$ROOT_DIR/$DOMAIN/$(date +%Y)/$(date +%m)/$WEEK_NUMBER"
 
-    # Create the destination directory if it doesn't exist
+    # Create dest dir if it doesn't exist
     if [ ! -d "$DESTINATION_DIR" ]; then
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Creating directory for domain: $DOMAIN" >> "$LOG_DIR/$DOMAIN.log" 
         mkdir -p "$DESTINATION_DIR"
     fi
 
-    # Dump backup information if the directory is not empty
+    # Dump backup info if dir is empty
     if [ "$(ls -A $DESTINATION_DIR)" ]; then 
         virtnbdrestore -i "$DESTINATION_DIR" -o dump 2>&1 | tee -a "$LOG_DIR/$DOMAIN.log"
     else
