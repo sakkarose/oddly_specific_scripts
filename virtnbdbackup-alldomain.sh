@@ -2,7 +2,7 @@
 
 ROOT_DIR='/home/backup-str'
 LOG_DIR="$ROOT_DIR/log"
-UPTIME_KUMA_URL='https://uptime.mizu.reisen/api/push/Y80kVEn7Os'
+UPTIME_KUMA_URL='changeme'
 
 # In weeks
 RETENTION_PERIOD=4
