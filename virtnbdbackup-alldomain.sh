@@ -3,12 +3,12 @@
 # --- Configuration ---
 ROOT_DIR='/home/backup-str'
 LOG_DIR="$ROOT_DIR/log"
-UPTIME_KUMA_URL='https://uptime.mizu.reisen/api/push/Y80kVEn7Os'
+UPTIME_KUMA_URL='uptime-kuma-link'
 RETENTION_PERIOD=4  # In weeks
-COPY_TO_NETWORK="true"  # Set to "false" to disable syncing
-RCLONE_REMOTE="kvm-network-backupcopy"  # Your rclone remote name
-RCLONE_REMOTE_DIR="/home/hoangdt/kvm-backupcopy"  # The directory on the remote
-# --- End of Configuration ---
+COPY_TO_NETWORK="true"
+RCLONE_REMOTE="kvm-network-backupcopy"
+RCLONE_REMOTE_DIR="/home/hoangdt/kvm-backupcopy"
+
 
 # Get the week number of the month (1-4)
 get_week_number() {
@@ -17,15 +17,15 @@ get_week_number() {
     echo $(( (week_number - 1) % 4 + 1 ))
 }
 
-DATE=$(date +%Y-%m-%d)  # Consistent date format for folders
+DATE=$(date +%Y-%m-%d)
 WEEK_NUMBER=$(get_week_number "$DATE")
 
-LOG_FILE="$LOG_DIR/backup_$(date +%Y-%m).log"  # Log file named by year and month
+LOG_FILE="$LOG_DIR/backup_$(date +%Y-%m).log"
 
 # Rotate log file at the beginning of each month
-if [ $(date +%d) -eq "01" ]; then  # Check if it's the first day of the month
-    mv "$LOG_FILE" "$LOG_FILE.$(date +%Y%m%d%H%M%S)"  # Rotate the previous month's log
-    touch "$LOG_FILE"  # Create a new log file for the current month
+if [ $(date +%d) -eq "01" ]; then
+    mv "$LOG_FILE" "$LOG_FILE.$(date +%Y%m%d%H%M%S)"
+    touch "$LOG_FILE"
 fi
 
 DOMAINS=$(virsh list --all --name)
@@ -68,19 +68,19 @@ for DOMAIN in $DOMAINS; do
 
     # Calculate the cutoff week number
     current_week=$(date +%V)
-    cutoff_week=$(( current_week - RETENTION_PERIOD ))  # Keep backups from the last week
+    cutoff_week=$(( current_week - RETENTION_PERIOD ))
 
-    # Cleanup old backup directories (older than the cutoff week) using -mtime
+    # Cleanup old backup directories (older than the cutoff week)
     find "$ROOT_DIR/$DOMAIN" -mindepth 1 -type d -mtime +$((RETENTION_PERIOD * 7)) -print0 | while IFS= read -r -d '' dir; do
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Removing old backup directory: $dir" >> "$LOG_FILE"
         rm -rf "$dir"
     done
 done
 
-# Sync with network storage using rclone sync (outside the loop)
+# Sync with network storage using rclone sync
 if [ "$COPY_TO_NETWORK" = "true" ]; then
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Syncing with network storage..." >> "$LOG_FILE"
-    rclone sync -v --retries 5 "$ROOT_DIR" "$RCLONE_REMOTE:$RCLONE_REMOTE_DIR" >> "$LOG_FILE" 2>&1  # Using variables
+    rclone sync -v --retries 5 "$ROOT_DIR" "$RCLONE_REMOTE:$RCLONE_REMOTE_DIR" >> "$LOG_FILE" 2>&1
     if [ $? -eq 0 ]; then
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Successfully synced with network storage." >> "$LOG_FILE"
     else
