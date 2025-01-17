@@ -1,15 +1,14 @@
 #!/bin/bash
 
+# --- Configuration ---
 ROOT_DIR='/home/backup-str'
 LOG_DIR="$ROOT_DIR/log"
-UPTIME_KUMA_URL='changeme'
-
-# In weeks
-RETENTION_PERIOD=4
-
-# Network mount settings
-NETWORK_MOUNT="/mnt/backup-network"  # Replace with actual mount point
-COPY_TO_NETWORK="true"  # Set to "false" to disable copying
+UPTIME_KUMA_URL='https://uptime.mizu.reisen/api/push/Y80kVEn7Os'
+RETENTION_PERIOD=4  # In weeks
+COPY_TO_NETWORK="true"  # Set to "false" to disable syncing
+RCLONE_REMOTE="kvm-network-backupcopy"  # Your rclone remote name
+RCLONE_REMOTE_DIR="/home/hoangdt/kvm-backupcopy"  # The directory on the remote
+# --- End of Configuration ---
 
 # Get the week number of the month (1-4)
 get_week_number() {
@@ -27,17 +26,6 @@ LOG_FILE="$LOG_DIR/backup_$(date +%Y-%m).log"  # Log file named by year and mont
 if [ $(date +%d) -eq "01" ]; then  # Check if it's the first day of the month
     mv "$LOG_FILE" "$LOG_FILE.$(date +%Y%m%d%H%M%S)"  # Rotate the previous month's log
     touch "$LOG_FILE"  # Create a new log file for the current month
-fi
-
-# Mount network storage with rclone
-if [ "$COPY_TO_NETWORK" = "true" ]; then
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Mounting network storage..." >> "$LOG_FILE"
-    rclone mount your-rclone-remote: "$NETWORK_MOUNT" --allow-other >> "$LOG_FILE" 2>&1 &
-    # Wait for rclone to mount
-    while ! mountpoint -q "$NETWORK_MOUNT"; do
-        echo "[$(date +'%Y-%m-%d %H:%M:%S')] Waiting for network storage to mount..." >> "$LOG_FILE"
-        sleep 5
-    done
 fi
 
 DOMAINS=$(virsh list --all --name)
@@ -78,36 +66,25 @@ for DOMAIN in $DOMAINS; do
         curl -fsS -m 10 --retry 5 -o /dev/null "$UPTIME_KUMA_URL?status=down&msg=Verification%20of%20$DOMAIN%20backup%20failed" 
     fi
 
-    # Copy backup to network storage
-    if [ "$COPY_TO_NETWORK" = "true" ]; then
-        if mountpoint -q "$NETWORK_MOUNT"; then
-            echo "[$(date +'%Y-%m-%d %H:%M:%S')] Copying backup to network storage..." >> "$LOG_FILE"
-            cp -r "$DESTINATION_DIR" "$NETWORK_MOUNT/$DOMAIN/$(date +%Y)/$(date +%m)/$WEEK_NUMBER" >> "$LOG_FILE" 2>&1
-            if [ $? -eq 0 ]; then
-                echo "[$(date +'%Y-%m-%d %H:%M:%S')] Backup successfully copied to network storage." >> "$LOG_FILE"
-            else
-                echo "[$(date +'%Y-%m-%d %H:%M:%S')] Error copying backup to network storage." >> "$LOG_FILE"
-                curl -fsS -m 10 --retry 5 -o /dev/null "$UPTIME_KUMA_URL?status=down&msg=Copy%20to%20network%20storage%20failed"
-            fi
-        else
-            echo "[$(date +'%Y-%m-%d %H:%M:%S')] Network storage not mounted. Skipping copy." >> "$LOG_FILE"
-        fi
-    fi
-
     # Calculate the cutoff week number
     current_week=$(date +%V)
     cutoff_week=$(( current_week - RETENTION_PERIOD ))  # Keep backups from the last week
 
-    # Cleanup old backup directories (older than the cutoff week)
-    find "$ROOT_DIR/$DOMAIN" -mindepth 1 -type d -date "before $cutoff_week weeks ago" -print0 | while IFS= read -r -d '' dir; do
+    # Cleanup old backup directories (older than the cutoff week) using -mtime
+    find "$ROOT_DIR/$DOMAIN" -mindepth 1 -type d -mtime +$((RETENTION_PERIOD * 7)) -print0 | while IFS= read -r -d '' dir; do
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Removing old backup directory: $dir" >> "$LOG_FILE"
         rm -rf "$dir"
     done
-    
 done
 
-# Unmount network storage (optional)
+# Sync with network storage using rclone sync (outside the loop)
 if [ "$COPY_TO_NETWORK" = "true" ]; then
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Unmounting network storage..." >> "$LOG_FILE"
-    fusermount -u "$NETWORK_MOUNT" >> "$LOG_FILE" 2>&1
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Syncing with network storage..." >> "$LOG_FILE"
+    rclone sync -v --retries 5 "$ROOT_DIR" "$RCLONE_REMOTE:$RCLONE_REMOTE_DIR" >> "$LOG_FILE" 2>&1  # Using variables
+    if [ $? -eq 0 ]; then
+        echo "[$(date +'%Y-%m-%d %H:%M:%S')] Successfully synced with network storage." >> "$LOG_FILE"
+    else
+        echo "[$(date +'%Y-%m-%d %H:%M:%S')] Error syncing with network storage." >> "$LOG_FILE"
+        curl -fsS -m 10 --retry 5 -o /dev/null "$UPTIME_KUMA_URL?status=down&msg=Sync%20with%20network%20storage%20failed"
+    fi
 fi
