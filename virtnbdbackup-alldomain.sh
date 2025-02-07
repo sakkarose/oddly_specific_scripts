@@ -80,7 +80,7 @@ done
 # Sync with network storage using rclone sync
 if [ "$COPY_TO_NETWORK" = "true" ]; then
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] Syncing with network storage..." >> "$LOG_FILE"
-    rclone sync -v --retries 5 "$ROOT_DIR" "$RCLONE_REMOTE:$RCLONE_REMOTE_DIR" >> "$LOG_FILE" 2>&1
+    rclone sync -v --retries 5 --retries-sleep 30s "$ROOT_DIR" "$RCLONE_REMOTE:$RCLONE_REMOTE_DIR" >> "$LOG_FILE" 2>&1
     if [ $? -eq 0 ]; then
         echo "[$(date +'%Y-%m-%d %H:%M:%S')] Successfully synced with network storage." >> "$LOG_FILE"
     else
