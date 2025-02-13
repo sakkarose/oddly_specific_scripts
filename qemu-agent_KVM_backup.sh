@@ -363,13 +363,31 @@ backup_vm() {
             if [[ "$BACKUP_TYPE" == "live" ]]; then
                 # Live Full Backup using snapshot
                 local snapshot_file="$VM_BACKUP_DIR/$VM_NAME-${timestamp}_${disk}_snapshot.qcow2"
-                virsh snapshot-create-as --domain "$VM_NAME" --name "backup_snapshot_$disk" \
-                  --description "Backup snapshot" --disk-only --atomic \
-                  --diskspec "$disk,file=$snapshot_file" || { log "Error: Snapshot creation failed for $disk"; exit 1; }
+                
+                # Create snapshot using blockdev-snapshot instead
+                local disk_path=$(virsh domblklist "$VM_NAME" | awk -v disk="$disk" '$1 == disk {print $2}')
+                
+                log "Creating snapshot for disk $disk at $snapshot_file"
+                virsh qemu-monitor-command "$VM_NAME" --hmp \
+                  "drive-backup device=$disk target=$snapshot_file sync=full" || {
+                    log "Error: Snapshot creation failed for $disk"
+                    exit 1
+                }
+                
+                # Wait for snapshot to complete
+                sleep 2
 
-                qemu-img convert -f qcow2 -O qcow2 -c "$snapshot_file" "$backup_file" || { log "Error: qemu-img convert failed for $disk"; exit 1; }
-                # Use --diskspec for deletion: More robust.
-                virsh snapshot-delete "$VM_NAME" "backup_snapshot_$disk" --diskspec "$disk" || { log "Warning: Snapshot deletion failed for $disk"; exit 1; }
+                qemu-img convert -f qcow2 -O qcow2 -c "$snapshot_file" "$backup_file" || { 
+                    log "Error: qemu-img convert failed for $disk"
+                    rm -f "$snapshot_file"
+                    exit 1
+                }
+
+                # Clean up snapshot file
+                rm -f "$snapshot_file"
+
+                # Initialize or reset the chain file
+                echo "$backup_file $(date +%s)" > "$BACKUP_CHAIN_FILE"
 
             elif [[ "$BACKUP_TYPE" == "offline" ]]; then
                 qemu-img convert -f qcow2 -O qcow2 -c "$target" "$backup_file" || { log "Error: qemu-img convert failed for $disk"; exit 1; }
