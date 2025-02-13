@@ -143,6 +143,58 @@ reset_vm_disk_state() {
     return 0
 }
 
+cleanup_checkpoints() {
+    local VM_NAME="$1"
+    log "Cleaning up checkpoints for $VM_NAME..."
+    
+    # First try to start the VM temporarily to delete checkpoints
+    local VM_WAS_RUNNING=false
+    if virsh domstate "$VM_NAME" | grep -q "running"; then
+        VM_WAS_RUNNING=true
+    else
+        log "Starting VM temporarily to clean checkpoints..."
+        virsh start "$VM_NAME" || {
+            log "Warning: Could not start VM to clean checkpoints"
+            return 1
+        }
+        # Wait for VM to be ready
+        sleep 5
+    fi
+
+    # Get list of checkpoints first
+    local checkpoints
+    checkpoints=$(virsh checkpoint-list "$VM_NAME" --name 2>/dev/null)
+    
+    if [[ -n "$checkpoints" ]]; then
+        log "Found checkpoints, attempting cleanup..."
+        echo "$checkpoints" | while read -r checkpoint; do
+            if [[ -n "$checkpoint" ]]; then
+                log "Removing checkpoint: $checkpoint"
+                # Try different methods to delete the checkpoint
+                virsh checkpoint-delete "$VM_NAME" "$checkpoint" --metadata 2>/dev/null || \
+                virsh checkpoint-delete "$VM_NAME" "$checkpoint" --metadata --force 2>/dev/null || \
+                virsh checkpoint-delete "$VM_NAME" "$checkpoint" --force 2>/dev/null || {
+                    log "Warning: Could not delete checkpoint $checkpoint"
+                }
+            fi
+        done
+    fi
+
+    # If we started the VM, stop it again
+    if ! $VM_WAS_RUNNING; then
+        log "Stopping VM after checkpoint cleanup..."
+        virsh destroy "$VM_NAME"
+    fi
+
+    # Verify all checkpoints are gone
+    if virsh checkpoint-list "$VM_NAME" --name 2>/dev/null | grep -q .; then
+        log "Warning: Some checkpoints could not be removed"
+        return 1
+    fi
+    
+    return 0
+}
+
 backup_vm() {
     local VM_NAME="$1"
     local BACKUP_TYPE="$2" # "live" or "offline"
@@ -285,18 +337,11 @@ backup_vm() {
         # Improved checkpoint handling
         log "Checking for existing checkpoints..."
         if virsh checkpoint-list "$VM_NAME" --name 2>/dev/null | grep -q .; then
-            log "Warning: Checkpoints exist for VM $VM_NAME. Deleting..."
-            
-            # Get list of checkpoints and delete them one by one
-            virsh checkpoint-list "$VM_NAME" --name 2>/dev/null | while read -r checkpoint; do
-                if [[ -n "$checkpoint" ]]; then
-                    log "Deleting checkpoint: $checkpoint"
-                    virsh checkpoint-delete "$VM_NAME" "$checkpoint" || {
-                        log "Warning: Failed to delete checkpoint $checkpoint"
-                        continue
-                    }
-                fi
-            done
+            log "Warning: Checkpoints exist for VM $VM_NAME. Attempting cleanup..."
+            if ! cleanup_checkpoints "$VM_NAME"; then
+                log "Error: Failed to clean up checkpoints. Manual intervention required."
+                exit 1
+            fi
         fi
 
         # Determine if it's a full or incremental backup.  More robust check.
