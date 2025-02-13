@@ -86,22 +86,12 @@ reset_vm_disk_state() {
     local VM_NAME="$1"
     log "Attempting to reset VM disk state..."
     
-    # Get original disk path by following the backing chain
-    local current_disk original_disk backing_file
-    current_disk=$(virsh dumpxml "$VM_NAME" | grep -o "source file='[^']*'" | head -1 | sed "s/source file='\([^']*\)'/\1/")
-    
-    # Follow the backing chain until we find the original disk
-    while [[ -n "$current_disk" ]]; do
-        backing_file=$(qemu-img info "$current_disk" | grep "backing file:" | sed 's/backing file: *//')
-        if [[ -z "$backing_file" ]]; then
-            break
-        fi
-        original_disk="$current_disk"
-        current_disk="$backing_file"
-    done
+    # Get original disk path directly from the VM XML
+    local original_disk
+    original_disk=$(virsh dumpxml "$VM_NAME" | xmllint --xpath "string(//disk[@device='disk']/source/@file)" - 2>/dev/null)
     
     if [[ -z "$original_disk" ]]; then
-        log "Error: Could not determine original disk path"
+        log "Error: Could not determine original disk path from XML"
         return 1
     fi
     
@@ -113,20 +103,41 @@ reset_vm_disk_state() {
         virsh destroy "$VM_NAME"
     fi
     
-    # Remove all snapshots
+    # Remove all snapshots, including external ones
     log "Removing snapshots..."
     virsh snapshot-list "$VM_NAME" --name 2>/dev/null | while read -r snap; do
+        log "Removing snapshot: $snap"
+        # Try metadata-only removal first
         virsh snapshot-delete "$VM_NAME" "$snap" --metadata 2>/dev/null || true
+        # Then try full removal
         virsh snapshot-delete "$VM_NAME" "$snap" 2>/dev/null || true
     done
     
+    # Get current disks to clean up
+    local current_disks
+    current_disks=$(virsh domblklist "$VM_NAME" | awk 'NR>2 && $2!="" {print $2}')
+    
     # Update VM configuration
     log "Updating VM configuration..."
-    virsh dumpxml "$VM_NAME" | sed "s|<source file='[^']*'/>|<source file='$original_disk'/>|" > /tmp/vm_config.xml
+    virsh dumpxml "$VM_NAME" > /tmp/vm_config.xml
+    
+    # Update disk paths in the XML
+    sed -i "s|<source file='[^']*'/>|<source file='$original_disk'/>|g" /tmp/vm_config.xml
+    sed -i "s|<source file=\"[^\"]*\"/>|<source file=\"$original_disk\"/>|g" /tmp/vm_config.xml
+    
+    # Undefine and redefine the VM
     virsh destroy "$VM_NAME" 2>/dev/null || true
-    virsh undefine "$VM_NAME" 2>/dev/null || true
+    virsh undefine "$VM_NAME" --nvram --snapshots-metadata 2>/dev/null || true
     virsh define /tmp/vm_config.xml
     rm -f /tmp/vm_config.xml
+    
+    # Clean up any leftover snapshot files
+    while read -r disk_file; do
+        if [[ "$disk_file" != "$original_disk" && -f "$disk_file" ]]; then
+            log "Removing leftover disk file: $disk_file"
+            rm -f "$disk_file"
+        fi
+    done <<< "$current_disks"
     
     log "VM disk state reset complete. Original disk path: $original_disk"
     return 0
@@ -537,12 +548,14 @@ if [[ "$1" == "backup" ]]; then
     cleanup_backups
 
 elif [[ "$1" == "restore" ]]; then
+    check_lock  # Add lock check
     if [[ -z "$2" ]]; then
         echo "Usage: $0 restore <VM_NAME>" >&3
         exit 1
     fi
-    local VM_NAME="$2"
+    VM_NAME="$2"
     restore_vm "$VM_NAME"  # Fixed function call syntax - removed parentheses
+
 else
     echo "Usage: $0 [backup|restore] [<VM_NAME>]" >&3
     echo "       $0 backup [live|offline] [<VM_NAME>]" >&3
