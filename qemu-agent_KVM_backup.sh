@@ -86,12 +86,33 @@ reset_vm_disk_state() {
     local VM_NAME="$1"
     log "Attempting to reset VM disk state..."
     
-    # Get original disk path directly from the VM XML
+    # Look for original disk path in the VM config or backup directory
     local original_disk
-    original_disk=$(virsh dumpxml "$VM_NAME" | xmllint --xpath "string(//disk[@device='disk']/source/@file)" - 2>/dev/null)
     
-    if [[ -z "$original_disk" ]]; then
-        log "Error: Could not determine original disk path from XML"
+    # First try to find original disk in standard location
+    original_disk="/var/lib/libvirt/images/${VM_NAME}.qcow2"
+    
+    # If not found, try to get it from backup chain file
+    if [[ ! -f "$original_disk" ]]; then
+        local chain_file="$BACKUP_DIR/$VM_NAME/${VM_NAME}_vda_chain.txt"
+        if [[ -f "$chain_file" ]]; then
+            # Get the oldest (first) backup which should be a full backup
+            original_disk=$(head -n 1 "$chain_file" | cut -d' ' -f1)
+        fi
+    fi
+    
+    # Final fallback - try to get it from libvirt XML
+    if [[ ! -f "$original_disk" ]]; then
+        original_disk=$(virsh dumpxml "$VM_NAME" | xmllint --xpath "string(//disk[@device='disk']/source/@file)" - 2>/dev/null)
+        # Skip if path contains snapshot or backup
+        if [[ "$original_disk" == *"snapshot"* ]] || [[ "$original_disk" == *"backup"* ]]; then
+            log "Error: Could not determine original disk path - found backup/snapshot path"
+            return 1
+        fi
+    fi
+    
+    if [[ ! -f "$original_disk" ]]; then
+        log "Error: Could not determine original disk path"
         return 1
     fi
     
@@ -103,27 +124,25 @@ reset_vm_disk_state() {
         virsh destroy "$VM_NAME"
     fi
     
-    # Remove all snapshots, including external ones
+    # Remove all snapshots
     log "Removing snapshots..."
     virsh snapshot-list "$VM_NAME" --name 2>/dev/null | while read -r snap; do
-        log "Removing snapshot: $snap"
-        # Try metadata-only removal first
-        virsh snapshot-delete "$VM_NAME" "$snap" --metadata 2>/dev/null || true
-        # Then try full removal
-        virsh snapshot-delete "$VM_NAME" "$snap" 2>/dev/null || true
+        if [[ -n "$snap" ]]; then
+            log "Removing snapshot: $snap"
+            virsh snapshot-delete "$VM_NAME" "$snap" --metadata 2>/dev/null || true
+            virsh snapshot-delete "$VM_NAME" "$snap" 2>/dev/null || true
+        fi
     done
-    
-    # Get current disks to clean up
-    local current_disks
-    current_disks=$(virsh domblklist "$VM_NAME" | awk 'NR>2 && $2!="" {print $2}')
     
     # Update VM configuration
     log "Updating VM configuration..."
     virsh dumpxml "$VM_NAME" > /tmp/vm_config.xml
     
-    # Update disk paths in the XML
-    sed -i "s|<source file='[^']*'/>|<source file='$original_disk'/>|g" /tmp/vm_config.xml
-    sed -i "s|<source file=\"[^\"]*\"/>|<source file=\"$original_disk\"/>|g" /tmp/vm_config.xml
+    # Update disk paths in the XML - more specific pattern
+    sed -i "/<disk.*type='file'.*device='disk'/,/<\/disk>/ {
+        s|<source file='[^']*'/>|<source file='$original_disk'/>|g
+        s|<source file=\"[^\"]*\"/>|<source file=\"$original_disk\"/>|g
+    }" /tmp/vm_config.xml
     
     # Undefine and redefine the VM
     virsh destroy "$VM_NAME" 2>/dev/null || true
@@ -132,12 +151,31 @@ reset_vm_disk_state() {
     rm -f /tmp/vm_config.xml
     
     # Clean up any leftover snapshot files
-    while read -r disk_file; do
-        if [[ "$disk_file" != "$original_disk" && -f "$disk_file" ]]; then
-            log "Removing leftover disk file: $disk_file"
-            rm -f "$disk_file"
-        fi
-    done <<< "$current_disks"
+    find "$BACKUP_DIR/$VM_NAME" -name "*_snapshot.qcow2" -type f -delete
+    
+    # After defining the VM, start it if this is a live backup
+    if [[ "$BACKUP_TYPE" == "live" ]]; then
+        log "Starting VM for live backup..."
+        virsh start "$VM_NAME" || {
+            log "Error: Failed to start VM after reset"
+            return 1
+        }
+        
+        # Wait for VM to be ready
+        local timeout=30
+        local start_time=$(date +%s)
+        while ! virsh domstate "$VM_NAME" | grep -q "running"; do
+            sleep 1
+            local elapsed_time=$(( $(date +%s) - start_time ))
+            if [[ "$elapsed_time" -gt "$timeout" ]]; then
+                log "Error: VM failed to start within timeout"
+                return 1
+            fi
+        done
+        
+        # Additional wait for VM to be fully ready
+        sleep 5
+    fi
     
     log "VM disk state reset complete. Original disk path: $original_disk"
     return 0
@@ -296,6 +334,17 @@ backup_vm() {
 
     check_disk_space "$total_disk_size"
 
+    # Ensure VM is running for live backup
+    if [[ "$BACKUP_TYPE" == "live" && ! $(virsh domstate "$VM_NAME") =~ "running" ]]; then
+        log "Starting VM for live backup..."
+        virsh start "$VM_NAME" || {
+            log "Error: Failed to start VM for live backup"
+            exit 1
+        }
+        # Wait for VM to be ready
+        sleep 5
+    fi
+
     # Offline Backup: Shutdown VM if running.
     if [[ "$BACKUP_TYPE" == "offline" && $(virsh domstate "$VM_NAME" 2>&3 | grep -q running) ]]; then
         log "Shutting down VM for offline backup..."
@@ -341,7 +390,7 @@ backup_vm() {
             if ! cleanup_checkpoints "$VM_NAME"; then
                 log "Error: Failed to clean up checkpoints. Manual intervention required."
                 exit 1
-            fi
+            }
         fi
 
         # Determine if it's a full or incremental backup.  More robust check.
@@ -356,45 +405,51 @@ backup_vm() {
         fi
 
         if "$full_backup_needed"; then
-            # Full backup
             local backup_file="$VM_BACKUP_DIR/$VM_NAME-${timestamp}_${disk}_full.qcow2"
             log "Performing full backup for $disk..."
 
             if [[ "$BACKUP_TYPE" == "live" ]]; then
-                # Live Full Backup using snapshot
                 local snapshot_file="$VM_BACKUP_DIR/$VM_NAME-${timestamp}_${disk}_snapshot.qcow2"
                 
-                # Create snapshot using blockdev-snapshot instead
-                local disk_path=$(virsh domblklist "$VM_NAME" | awk -v disk="$disk" '$1 == disk {print $2}')
-                
-                log "Creating snapshot for disk $disk at $snapshot_file"
-                virsh qemu-monitor-command "$VM_NAME" --hmp \
-                  "drive-backup device=$disk target=$snapshot_file sync=full" || {
-                    log "Error: Snapshot creation failed for $disk"
+                log "Creating external snapshot for disk $disk"
+                qemu-img create -f qcow2 "$snapshot_file" || {
+                    log "Error: Failed to create snapshot file"
+                    rm -f "$snapshot_file"
                     exit 1
                 }
-                
-                # Wait for snapshot to complete
-                sleep 2
 
-                qemu-img convert -f qcow2 -O qcow2 -c "$snapshot_file" "$backup_file" || { 
+                log "Creating libvirt snapshot..."
+                virsh snapshot-create-as "$VM_NAME" \
+                    "backup_snapshot_${disk}" \
+                    --disk-only \
+                    --atomic \
+                    --no-metadata \
+                    --diskspec "$disk,file=$snapshot_file,snapshot=external" || {
+                    log "Error: Failed to create external snapshot"
+                    rm -f "$snapshot_file"
+                    exit 1
+                }
+
+                log "Converting snapshot to backup file..."
+                qemu-img convert -f qcow2 -O qcow2 -c "$snapshot_file" "$backup_file" || {
                     log "Error: qemu-img convert failed for $disk"
                     rm -f "$snapshot_file"
                     exit 1
                 }
 
-                # Clean up snapshot file
-                rm -f "$snapshot_file"
+                log "Committing and removing snapshot..."
+                virsh blockcommit "$VM_NAME" "$disk" --active --pivot || {
+                    log "Error: Failed to commit snapshot"
+                    rm -f "$snapshot_file"
+                    exit 1
+                }
 
-                # Initialize or reset the chain file
+                rm -f "$snapshot_file"
                 echo "$backup_file $(date +%s)" > "$BACKUP_CHAIN_FILE"
 
             elif [[ "$BACKUP_TYPE" == "offline" ]]; then
                 qemu-img convert -f qcow2 -O qcow2 -c "$target" "$backup_file" || { log "Error: qemu-img convert failed for $disk"; exit 1; }
             fi
-
-            # Initialize or reset the chain file
-            echo "$backup_file $(date +%s)" > "$BACKUP_CHAIN_FILE"
 
         else
             # Incremental backup
