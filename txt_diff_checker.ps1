@@ -1,5 +1,17 @@
-$file1 = ""
-$file2 = ""
+# Get current directory path
+$currentDir = $PSScriptRoot
+$file1 = Join-Path $currentDir ""
+$file2 = Join-Path $currentDir ""
+
+# Check if files exist first
+if (!(Test-Path $file1)) {
+    Write-Warning "Cannot find file: $file1"
+    exit
+}
+if (!(Test-Path $file2)) {
+    Write-Warning "Cannot find file: $file2"
+    exit
+}
 
 # Read files as bytes to check for BOM and encoding
 $bytes1 = [System.IO.File]::ReadAllBytes($file1)
