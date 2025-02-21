@@ -11,112 +11,95 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     }
 }
 
+# Get the directory where the script is located
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 # Get the default user desktop path
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 
-# Create a unique filename (prevents overwriting)
-$counter = 1
-$excelPath = Join-Path -Path $desktopPath -ChildPath "MDM_survey.xlsx"
-while (Test-Path $excelPath) {
-    $excelPath = Join-Path -Path $desktopPath -ChildPath "MDM_survey_$counter.xlsx"
-    $counter++
+# --- Installed Software ---
+
+# Create a unique filename for the Installed Software text file
+$installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software.txt"
+$installedSoftwareCounter = 1
+while (Test-Path $installedSoftwarePath) {
+    $installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software_$installedSoftwareCounter.txt"
+    $installedSoftwareCounter++
 }
-
-# Create a unique filename for the CSV file (prevents overwriting)
-$csvPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info.csv"
-$csvCounter = 1
-while (Test-Path $csvPath) {
-    $csvPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info_$csvCounter.csv"
-    $csvCounter++
-}
-
-# Create an Excel object
-$excel = New-Object -ComObject Excel.Application
-$excel.Visible = $false
-
-# Create a new workbook
-$workbook = $excel.Workbooks.Add()
-
-# Rename the first sheet
-$worksheet = $workbook.Worksheets.Item(1)
-$worksheet.Name = "Installed Software"
-
-# Add headers
-$worksheet.Cells(1, 1) = "Software Name"
-$worksheet.Cells(1, 2) = "Version"
-$worksheet.Cells(1, 3) = "Install Date"
-$worksheet.Cells(1, 4) = "Publisher"
 
 # Get installed software
 $software = Get-WmiObject -Class Win32_Product | Select-Object Name, Version, InstallDate, Vendor | Where-Object {$_.Name -ne $null}
-#Get-ComputerInfo
 
-$row = 2
-
+# Format the software information
+$softwareOutput = ""
 foreach ($app in $software) {
     try {
-        $worksheet.Cells($row, 1) = $app.Name
-        $worksheet.Cells($row, 2) = $app.Version
-
-        if ($app.InstallDate) {
-            $installDate = [datetime]::ParseExact($app.InstallDate.Substring(0,8), "yyyyMMdd", $null).ToString("dd/MM/yyyy")
-            $worksheet.Cells($row, 3) = $installDate
+        $installDate = if ($app.InstallDate) {
+            [datetime]::ParseExact($app.InstallDate.Substring(0,8), "yyyyMMdd", $null).ToString("dd/MM/yyyy")
         } else {
-            $worksheet.Cells($row, 3) = "" # Handle cases where InstallDate is null
+            "" # Handle cases where InstallDate is null
         }
 
-        $worksheet.Cells($row, 4) = $app.Vendor
-        $row++
+        $softwareOutput += @"
+Software Name: $($app.Name)
+Version: $($app.Version)
+Install Date: $installDate
+Publisher: $($app.Vendor)
+
+"@
     }
     catch {
         Write-Warning "Error processing software: $($app.Name) - $($_.Exception.Message)"
     }
 }
 
-$osWorksheet = $workbook.Sheets.Add()
-$osWorksheet.Name = "OS Information"
+# Write the software information to the text file
+$softwareOutput | Out-File -FilePath $installedSoftwarePath -Encoding UTF8
+
+Write-Host "Installed Software information saved to: $installedSoftwarePath"
+
+# --- OS Information ---
+
+# Create a unique filename for the OS Information text file
+$osInfoPath = Join-Path -Path $desktopPath -ChildPath "OS_Information.txt"
+$osInfoCounter = 1
+while (Test-Path $osInfoPath) {
+    $osInfoPath = Join-Path -Path $desktopPath -ChildPath "OS_Information_$osInfoCounter.txt"
+    $osInfoCounter++
+}
 
 # Get OS information using Get-ComputerInfo (default output)
 $osInfo = Get-ComputerInfo
-$tempFile = New-TemporaryFile
-$osInfo | Out-String | Set-Content -Path $tempFile.FullName -Encoding UTF8
-Get-Content -Path $tempFile.FullName | Clip
 
-# Paste the clipboard content into the sheet
-$osWorksheet.Range("A1").PasteSpecial()
+# Save OS information to the text file with UTF-8 encoding
+$osInfo | Out-File -FilePath $osInfoPath -Encoding UTF8
 
-# Remove the temporary file
-Remove-Item $tempFile.FullName
+Write-Host "OS information saved to: $osInfoPath"
 
-# Auto-fit columns for the OS sheet
-$osWorksheet.Columns.AutoFit()
+# --- Autopilot Information ---
+
+# Create a unique filename for the Autopilot Information text file
+$autopilotInfoPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info.txt"
+$autopilotInfoCounter = 1
+while (Test-Path $autopilotInfoPath) {
+    $autopilotInfoPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info_$autopilotInfoCounter.txt"
+    $autopilotInfoCounter++
+}
 
 # Check if Get-WindowsAutoPilotInfo is installed
 if (!(Get-Command Get-WindowsAutoPilotInfo -ErrorAction SilentlyContinue)) {
+    # Install the script
     Install-Script -Name Get-WindowsAutoPilotInfo -Force
 }
 
+# Get Autopilot information (make sure the script is loaded). Get-WindowsAutoPilotInfo # Dot-source the script to load it into the current scope
+
+# Get Autopilot information (default output)
 $autopilotInfo = Get-WindowsAutoPilotInfo
-$autopilotInfo | Export-Csv -Path $csvPath -NoTypeInformation
 
-Write-Host "Autopilot information saved to: $csvPath"
+# Save Autopilot information to the text file
+$autopilotInfo | Out-File -FilePath $autopilotInfoPath
 
-try {
-    $workbook.SaveAs($excelPath, 51)
-    $workbook.Close()
-    Write-Host "Software list saved to: $excelPath"
-}
-catch {
-    Write-Error "Error saving Excel file: $($_.Exception.Message)"
-}
+Write-Host "Autopilot information saved to: $autopilotInfoPath"
 
-$excel.Quit()
-
-# Release COM objects & garbage collection
-[System.Runtime.InteropServices.Marshal]::ReleaseComObject($worksheet) | Out-Null
-[System.Runtime.InteropServices.Marshal]::ReleaseComObject($osWorksheet) | Out-Null
-[System.Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) | Out-Null
-[System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null
-
-[System.GC]::Collect()
-[System.GC]::WaitForPendingFinalizers()
+#Read-Host "This line is used to hold the script for debugging purposes"
