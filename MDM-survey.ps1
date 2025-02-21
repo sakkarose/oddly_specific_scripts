@@ -140,4 +140,4 @@ Publisher: $($app.Vendor)
     Write-Warning "Skipping hash verification due to download error."
 }
 
-Read-Host "This line is to hold the script for debugging. Press Enter to finish."
+Read-Host "Finished. Press Enter to exit."
