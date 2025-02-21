@@ -129,7 +129,7 @@ Publisher: $($app.Vendor)
                     # Load the function silently
                     . Get-WindowsAutoPilotInfo > $null
                     
-                    # Capture and export the data, suppressing all output
+                    # Capture and export
                     $autopilotData = Get-WindowsAutoPilotInfo 2>$null
                     $autopilotData | Export-Csv -Path $autopilotInfoPath -NoTypeInformation
                     
@@ -142,7 +142,8 @@ Publisher: $($app.Vendor)
                 Write-Warning "No internet connection detected. Skipping Autopilot information."
             }
 
-            Write-Host "Script execution completed. Files have been saved to your desktop."
+            Read-Host "Script execution completed. Files have been saved to your desktop. Press Enter to exit"
+            explorer.exe $desktopPath
         } else {
             Write-Warning "Script hash mismatch! The script might have been modified."
             exit
@@ -156,12 +157,9 @@ catch {
     throw
 }
 finally {
-    # Ensure cleanup happens after all operations and user confirmation
-    Start-Sleep -Seconds 1  # Small delay to ensure all file operations complete
+    # Doublecheck on cleaning
+    Start-Sleep -Seconds 1
     if (Test-Path $tempScriptPath) {
         Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
     }
 }
-
-# Final user prompt after everything is done
-Read-Host "Press Enter to exit"
