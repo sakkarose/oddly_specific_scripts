@@ -16,20 +16,27 @@ $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $tempScriptPath = Join-Path $desktopPath "MDM_survey_temp_$timestamp.ps1"
 
-# Get script content with simplified encoding
+# Get script content with simplified encoding and normalize line endings
 if ($MyInvocation.MyCommand.Path) {
-    $scriptContent = Get-Content -Path $MyInvocation.MyCommand.Path -Raw
+    $scriptContent = (Get-Content -Path $MyInvocation.MyCommand.Path -Raw).Replace("`r`n", "`n")
 } else {
     try {
-        $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content
+        $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content.Replace("`r`n", "`n")
     } catch {
         Write-Warning "Failed to download original script for verification: $_"
         exit
     }
 }
 
-# Write temp file with UTF8 encoding
-Set-Content -Path $tempScriptPath -Value $scriptContent -Encoding UTF8
+# Convert line endings to consistent format before saving
+$scriptContent = $scriptContent.Replace("`n", "`r`n")
+
+# Write temp file with consistent line endings
+[System.IO.File]::WriteAllText(
+    $tempScriptPath,
+    $scriptContent,
+    [System.Text.UTF8Encoding]::new($false)  # UTF8 without BOM
+)
 
 # Calculate hash from temp file
 try {
