@@ -26,7 +26,10 @@ if ($MyInvocation.MyCommand.Path) {
     $lineEnding = if ($hasCarriageReturn) { "`r`n" } else { "`n" }
     
     # Detect if file has BOM
-    $hasBOM = $originalContent.Length >= 3 -and $originalContent[0] -eq 0xEF -and $originalContent[1] -eq 0xBB -and $originalContent[2] -eq 0xBF
+    $hasBOM = ($originalContent.Length -ge 3) -and 
+              ($originalContent[0] -eq 239) -and 
+              ($originalContent[1] -eq 187) -and 
+              ($originalContent[2] -eq 191)
 } else {
     # From GitHub, content is always UTF-8 without BOM and LF endings
     try {
