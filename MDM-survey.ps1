@@ -142,8 +142,8 @@ Publisher: $($app.Vendor)
                 Write-Warning "No internet connection detected. Skipping Autopilot information."
             }
 
-            Read-Host "Script execution completed. Files have been saved to your desktop. Press Enter to exit"
-            explorer.exe $desktopPath
+            Write-Host "Script execution completed. Files have been saved to your desktop."
+
         } else {
             Write-Warning "Script hash mismatch! The script might have been modified."
             exit
@@ -162,4 +162,10 @@ finally {
     if (Test-Path $tempScriptPath) {
         Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
     }
+}
+
+# These commands should be at the very end, outside all blocks
+if ($currentHash -eq $expectedHash) {
+    Read-Host "Press Enter to exit"
+    explorer.exe $desktopPath
 }
