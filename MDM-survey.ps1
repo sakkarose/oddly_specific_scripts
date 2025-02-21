@@ -1,16 +1,3 @@
-# Running as administrator
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    $response = Read-Host "This script requires administrator privileges. Do you want to restart as administrator? (Y/N)"
-
-    if ($response -eq "Y") {
-        Start-Process powershell -Verb RunAs -ArgumentList "-File", $MyInvocation.MyCommand.Path
-        exit
-    } else {
-        Write-Warning "Script requires administrator privileges to run. Exiting."
-        exit
-    }
-}
-
 # Stored hash
 $hashFileURL = "https://file.mizu.reisen/share/mdm_survey_hash.txt"
 
