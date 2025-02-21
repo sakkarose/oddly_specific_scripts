@@ -22,7 +22,7 @@ if ($MyInvocation.MyCommand.Path) {
     $scriptContent = [System.Text.Encoding]::UTF8.GetString($originalContent)
     
     # Detect original line endings
-    $hasCarriageReturn = [System.Text.Encoding]::UTF8.GetString($originalContent).Contains("`r`n")
+    $hasCarriageReturn = $scriptContent.Contains("`r`n")
     $lineEnding = if ($hasCarriageReturn) { "`r`n" } else { "`n" }
     
     # Detect if file has BOM
@@ -33,7 +33,8 @@ if ($MyInvocation.MyCommand.Path) {
 } else {
     # From GitHub, content is always UTF-8 without BOM and LF endings
     try {
-        $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content
+        $webResponse = Invoke-WebRequest -Uri $scriptURL -UseBasicParsing
+        $scriptContent = [System.Text.Encoding]::UTF8.GetString($webResponse.Content)
         $lineEnding = "`n"
         $hasBOM = $false
     } catch {
@@ -185,3 +186,5 @@ if ($currentHash -eq $expectedHash) {
     Read-Host "Press Enter to exit"
     explorer.exe $desktopPath
 }
+
+Read-Host "Press Enter to exit"
