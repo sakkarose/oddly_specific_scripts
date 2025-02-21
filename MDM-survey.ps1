@@ -164,7 +164,6 @@ finally {
     }
 }
 
-# These commands should be at the very end, outside all blocks
 if ($currentHash -eq $expectedHash) {
     Read-Host "Press Enter to exit"
     explorer.exe $desktopPath
