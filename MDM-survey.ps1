@@ -1,10 +1,10 @@
-# Stored hash URL
+# Stored hash URL - update hash matching section
 $hashFileURL = "https://file.mizu.reisen/share/mdm_survey_hash.txt"
 $scriptURL = "https://raw.githubusercontent.com/sakkarose/oddly_specific_scripts/refs/heads/main/MDM-survey.ps1"
 
-# Download the hash and original script
+# Download the hash and original script with proper encoding handling
 $expectedHash = try {
-    (Invoke-WebRequest -Uri $hashFileURL -UseBasicParsing).Content.Trim()
+    [System.Web.HttpUtility]::HtmlDecode((Invoke-WebRequest -Uri $hashFileURL -UseBasicParsing).Content).Trim()
 } catch {
     Write-Warning "Failed to download the expected hash from '$hashFileURL'. Skipping hash verification."
     $null
@@ -15,12 +15,12 @@ $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $tempScriptPath = Join-Path $desktopPath "MDM_survey_temp_$timestamp.ps1"
 
-# Get script content
+# Get script content with explicit encoding
 if ($MyInvocation.MyCommand.Path) {
-    # Local file execution - read and normalize line endings
-    $scriptContent = [System.IO.File]::ReadAllText($MyInvocation.MyCommand.Path)
+    # Local file execution - read with UTF8
+    $scriptContent = [System.IO.File]::ReadAllText($MyInvocation.MyCommand.Path, [System.Text.Encoding]::UTF8)
 } else {
-    # Remote execution
+    # Remote execution with explicit encoding
     try {
         $response = Invoke-WebRequest -Uri $scriptURL -UseBasicParsing
         $scriptContent = [System.Text.Encoding]::UTF8.GetString($response.Content)
@@ -30,10 +30,8 @@ if ($MyInvocation.MyCommand.Path) {
     }
 }
 
-# Normalize line endings
-$scriptContent = $scriptContent.Replace("`r`n", "`n").Replace("`r", "`n").Replace("`n", "`r`n")
-$utf8NoBOM = [System.Text.UTF8Encoding]::new($false)
-[System.IO.File]::WriteAllText($tempScriptPath, $scriptContent, $utf8NoBOM)
+# Save with explicit UTF8 no BOM
+[System.IO.File]::WriteAllText($tempScriptPath, $scriptContent, [System.Text.UTF8Encoding]::new($false))
 
 # Calculate hash from temp file
 try {
@@ -55,7 +53,7 @@ try {
             $installedSoftwareCounter = 1
             while (Test-Path $installedSoftwarePath) {
                 $installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software_$installedSoftwareCounter.txt"
-                $installedSoftwareCounter++
+                $installedSoftwareCounter++ 
             }
 
             # Get software info
