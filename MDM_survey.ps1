@@ -15,29 +15,40 @@ $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $tempScriptPath = Join-Path $desktopPath "MDM_survey_temp_$timestamp.ps1"
 
-# Get script content (GitHub always serves with LF)
+# Get script content and detect line endings
 if ($MyInvocation.MyCommand.Path) {
-    # For local file, normalize to LF
-    $scriptContent = [System.IO.File]::ReadAllText($MyInvocation.MyCommand.Path).Replace("`r`n", "`n")
+    # For local file
+    $originalContent = [System.IO.File]::ReadAllBytes($MyInvocation.MyCommand.Path)
+    $scriptContent = [System.Text.Encoding]::UTF8.GetString($originalContent)
+    
+    # Detect original line endings
+    $hasCarriageReturn = [System.Text.Encoding]::UTF8.GetString($originalContent).Contains("`r`n")
+    $lineEnding = if ($hasCarriageReturn) { "`r`n" } else { "`n" }
+    
+    # Detect if file has BOM
+    $hasBOM = $originalContent.Length >= 3 -and $originalContent[0] -eq 0xEF -and $originalContent[1] -eq 0xBB -and $originalContent[2] -eq 0xBF
 } else {
-    # From GitHub, content is already LF
+    # From GitHub, content is always UTF-8 without BOM and LF endings
     try {
         $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content
+        $lineEnding = "`n"
+        $hasBOM = $false
     } catch {
         Write-Warning "Failed to download original script: $_"
         exit
     }
 }
 
-# Calculate hash from normalized content
-$bytes = [System.Text.Encoding]::UTF8.GetBytes($scriptContent)
+# Calculate hash from normalized content (always use LF for hash calculation)
+$normalizedContent = $scriptContent.Replace("`r`n", "`n")
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($normalizedContent)
 $currentHash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($bytes)) -Algorithm SHA256).Hash
 
-# Save local copy with Windows line endings
+# Save local copy with original line endings and encoding
 [System.IO.File]::WriteAllText(
     $tempScriptPath, 
-    $scriptContent.Replace("`n", "`r`n"),
-    [System.Text.UTF8Encoding]::new($false)
+    $scriptContent,
+    [System.Text.UTF8Encoding]::new($hasBOM)
 )
 
 try {
