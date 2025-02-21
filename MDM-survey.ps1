@@ -9,8 +9,9 @@ $expectedHash = try {
     $null
 }
 
-# Calculate the hash
-$currentHash = Get-FileHash -Path $MyInvocation.MyCommand.Path -Algorithm SHA256 | Select-Object -ExpandProperty Hash
+# Calculate the hash of the script content
+$scriptContent = Get-Content -Path $MyInvocation.MyCommand.Definition
+$currentHash = Get-FileHash -InputStream ([System.Text.Encoding]::UTF8.GetBytes($scriptContent)) -Algorithm SHA256 | Select-Object -ExpandProperty Hash
 
 # Compare the hashes
 if ($expectedHash) {
