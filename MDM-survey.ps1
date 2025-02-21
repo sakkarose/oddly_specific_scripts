@@ -2,10 +2,9 @@
 $hashFileURL = "https://file.mizu.reisen/share/mdm_survey_hash.txt"
 $scriptURL = "https://raw.githubusercontent.com/sakkarose/oddly_specific_scripts/refs/heads/main/MDM-survey.ps1"
 
-# Download the hash and original script - simplified for remote execution
+# Download the hash
 $expectedHash = try {
-    $hashResponse = Invoke-WebRequest -Uri $hashFileURL -UseBasicParsing
-    $hashResponse.Content.Trim()
+    (Invoke-WebRequest -Uri $hashFileURL -UseBasicParsing).Content.Trim()
 } catch {
     Write-Warning "Failed to download the expected hash from '$hashFileURL'. Skipping hash verification."
     $null
@@ -16,29 +15,31 @@ $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $tempScriptPath = Join-Path $desktopPath "MDM_survey_temp_$timestamp.ps1"
 
-# Get script content and normalize to unix-style first
+# Get script content (GitHub always serves with LF)
 if ($MyInvocation.MyCommand.Path) {
-    # Local file - normalize to LF first
-    $scriptContent = [System.IO.File]::ReadAllText($MyInvocation.MyCommand.Path).Replace("`r`n", "`n").Replace("`r", "`n")
+    # For local file, normalize to LF
+    $scriptContent = [System.IO.File]::ReadAllText($MyInvocation.MyCommand.Path).Replace("`r`n", "`n")
 } else {
-    # Remote execution - content will already be in LF
+    # From GitHub, content is already LF
     try {
-        $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content.Replace("`r`n", "`n").Replace("`r", "`n")
+        $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content
     } catch {
-        Write-Warning "Failed to download original script for verification: $_"
+        Write-Warning "Failed to download original script: $_"
         exit
     }
 }
 
-# Calculate hash using LF-only content
-$tempBytes = [System.Text.Encoding]::UTF8.GetBytes($scriptContent)
-$currentHash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($tempBytes)) -Algorithm SHA256).Hash
+# Calculate hash from normalized content
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($scriptContent)
+$currentHash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new($bytes)) -Algorithm SHA256).Hash
 
-# Only convert to Windows line endings for saving the file
-$scriptContent = $scriptContent.Replace("`n", "`r`n")
-[System.IO.File]::WriteAllText($tempScriptPath, $scriptContent, [System.Text.UTF8Encoding]::new($false))
+# Save local copy with Windows line endings
+[System.IO.File]::WriteAllText(
+    $tempScriptPath, 
+    $scriptContent.Replace("`n", "`r`n"),
+    [System.Text.UTF8Encoding]::new($false)
+)
 
-# Calculate hash from temp file
 try {
     $currentHash = (Get-FileHash -Path $tempScriptPath -Algorithm SHA256).Hash
     
