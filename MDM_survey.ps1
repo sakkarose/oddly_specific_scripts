@@ -1,6 +1,6 @@
 # Stored hash URL
 $hashFileURL = "https://file.mizu.reisen/share/mdm_survey_hash.txt"
-$scriptURL = "https://raw.githubusercontent.com/sakkarose/oddly_specific_scripts/refs/heads/main/MDM_survey.ps1"
+$scriptURL = "https://file.mizu.reisen/share/MDM_survey.ps1"
 
 # Download the hash
 $expectedHash = try {
