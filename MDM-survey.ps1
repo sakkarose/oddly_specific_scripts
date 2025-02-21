@@ -1,10 +1,11 @@
-# Stored hash URL - update hash matching section
+# Stored hash URL
 $hashFileURL = "https://file.mizu.reisen/share/mdm_survey_hash.txt"
-$scriptURL = "https://raw.githubusercontent.com/sakkarose/oddly_specific_scripts/refs/heads/main/MDM-survey.ps1"
+$scriptURL = "https://file.mizu.reisen/share/MDM_survey.ps1"
 
-# Download the hash and original script with proper encoding handling
+# Download the hash and original script - simplified for remote execution
 $expectedHash = try {
-    [System.Web.HttpUtility]::HtmlDecode((Invoke-WebRequest -Uri $hashFileURL -UseBasicParsing).Content).Trim()
+    $hashResponse = Invoke-WebRequest -Uri $hashFileURL -UseBasicParsing
+    $hashResponse.Content.Trim()
 } catch {
     Write-Warning "Failed to download the expected hash from '$hashFileURL'. Skipping hash verification."
     $null
@@ -15,23 +16,20 @@ $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $tempScriptPath = Join-Path $desktopPath "MDM_survey_temp_$timestamp.ps1"
 
-# Get script content with explicit encoding
+# Get script content with simplified encoding
 if ($MyInvocation.MyCommand.Path) {
-    # Local file execution - read with UTF8
-    $scriptContent = [System.IO.File]::ReadAllText($MyInvocation.MyCommand.Path, [System.Text.Encoding]::UTF8)
+    $scriptContent = Get-Content -Path $MyInvocation.MyCommand.Path -Raw
 } else {
-    # Remote execution with explicit encoding
     try {
-        $response = Invoke-WebRequest -Uri $scriptURL -UseBasicParsing
-        $scriptContent = [System.Text.Encoding]::UTF8.GetString($response.Content)
+        $scriptContent = (Invoke-WebRequest -Uri $scriptURL -UseBasicParsing).Content
     } catch {
         Write-Warning "Failed to download original script for verification: $_"
         exit
     }
 }
 
-# Save with explicit UTF8 no BOM
-[System.IO.File]::WriteAllText($tempScriptPath, $scriptContent, [System.Text.UTF8Encoding]::new($false))
+# Write temp file with UTF8 encoding
+Set-Content -Path $tempScriptPath -Value $scriptContent -Encoding UTF8
 
 # Calculate hash from temp file
 try {
@@ -40,7 +38,6 @@ try {
     if ($expectedHash) {
         if ($currentHash -eq $expectedHash) {
             Write-Host "Script integrity verified."
-            Write-Host "Script temp saved to: $tempScriptPath"
             
             # Running as administrator
             if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
