@@ -67,10 +67,10 @@ try {
     }
 
     # --- Installed Software ---
-    $installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software.txt"
+    $installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software.docx"
     $installedSoftwareCounter = 1
     while (Test-Path $installedSoftwarePath) {
-        $installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software_$installedSoftwareCounter.txt"
+        $installedSoftwarePath = Join-Path -Path $desktopPath -ChildPath "Installed_Software_$installedSoftwareCounter.docx"
         $installedSoftwareCounter++ 
     }
 
@@ -108,10 +108,10 @@ Publisher: $($app.Vendor)
     # --- OS Info ---
 
     # Create a unique filename
-    $osInfoPath = Join-Path -Path $desktopPath -ChildPath "OS_Information.txt"
+    $osInfoPath = Join-Path -Path $desktopPath -ChildPath "OS_Information.docx"
     $osInfoCounter = 1
     while (Test-Path $osInfoPath) {
-        $osInfoPath = Join-Path -Path $desktopPath -ChildPath "OS_Information_$osInfoCounter.txt"
+        $osInfoPath = Join-Path -Path $desktopPath -ChildPath "OS_Information_$osInfoCounter.docx"
         $osInfoCounter++
     }
 
@@ -135,10 +135,10 @@ Publisher: $($app.Vendor)
                 Install-Script -Name Get-WindowsAutoPilotInfo -Force -Scope CurrentUser > $null
             }
             
-            $autopilotInfoPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info.csv"
+            $autopilotInfoPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info.docx"
             $autopilotInfoCounter = 1
             while (Test-Path $autopilotInfoPath) {
-                $autopilotInfoPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info_$autopilotInfoCounter.csv"
+                $autopilotInfoPath = Join-Path -Path $desktopPath -ChildPath "Autopilot_Info_$autopilotInfoCounter.docx"
                 $autopilotInfoCounter++
             }
             
