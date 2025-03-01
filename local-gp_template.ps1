@@ -11,31 +11,33 @@ $ScheduledInstallDay = 7 # Saturday
 $ScheduledInstallTime = 3 # 3 AM
 
 $CredentialGuardEnabled = 1
+
 $RestrictSingleSession = 0
+$IdleSessionLimit = 0 # 0 = Never
 
 try {
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -ValueName "legalnoticeText" -Value $MessageText -Type String
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "legalnoticeText" -Value $MessageText -Type String
 
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -ValueName "MaxIdleTime" -Value $IdleSessionLimit -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "MaxIdleTime" -Value $IdleSessionLimit -Type DWord
 
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -ValueName "fDisableCdm" -Value $DriveRedirectionDisabled -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "fDisableCdm" -Value $DriveRedirectionDisabled -Type DWord
 
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\CredUI" -ValueName "DisablePasswordReveal" -Value $PasswordRevealButtonDisabled -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredUI" -Name "DisablePasswordReveal" -Value $PasswordRevealButtonDisabled -Type DWord
 
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient" -ValueName "EnableAutoDoh" -Value $DoHSetting -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient" -Name "EnableAutoDoh" -Value $DoHSetting -Type DWord
 
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -ValueName "DeferFeatureUpdatesPeriodInDays" -Value $FeatureUpdateDeferralDays -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Name "DeferFeatureUpdatesPeriodInDays" -Value $FeatureUpdateDeferralDays -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Value $NoAutoUpdate -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Value $AUOptions -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AutomaticMaintenanceEnabled" -Value $AutomaticMaintenanceEnabled -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallDay" -Value $ScheduledInstallDay -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallTime" -Value $ScheduledInstallTime -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AlwaysAutoRebootAtScheduledTime" -Value $AlwaysAutoRebootAtScheduledTime -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AutoInstallMinorUpdates" -Value $AutoInstallMinorUpdates -Type DWord
 
-    # Set Automatic Updates settings
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -ValueName "NoAutoUpdate" -Value $NoAutoUpdate -Type DWord
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -ValueName "AUOptions" -Value $AUOptions -Type DWord
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -ValueName "AutomaticMaintenanceEnabled" -Value $AutomaticMaintenanceEnabled -Type DWord
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -ValueName "ScheduledInstallDay" -Value $ScheduledInstallDay -Type DWord
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -ValueName "ScheduledInstallTime" -Value $ScheduledInstallTime -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" -Name "RequirePlatformSecurityFeatures" -Value $CredentialGuardEnabled -Type DWord
 
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" -ValueName "RequirePlatformSecurityFeatures" -Value $CredentialGuardEnabled -Type DWord
-
-    Set-GPRegistryValue -Name "Local Computer" -Key "HKLM\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -ValueName "fSingleSessionPerUser" -Value $RestrictSingleSession -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "fSingleSessionPerUser" -Value $RestrictSingleSession -Type DWord
 
     Write-Host "Local Group Policy settings updated successfully."
 
