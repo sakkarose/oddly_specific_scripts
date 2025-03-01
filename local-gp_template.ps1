@@ -9,6 +9,8 @@ $AUOptions = 4
 $AutomaticMaintenanceEnabled = 1
 $ScheduledInstallDay = 7 # Saturday
 $ScheduledInstallTime = 3 # 3 AM
+$AlwaysAutoRebootAtScheduledTime = 1
+$AutoInstallMinorUpdates = 1
 
 $CredentialGuardEnabled = 1
 
@@ -35,7 +37,8 @@ try {
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AlwaysAutoRebootAtScheduledTime" -Value $AlwaysAutoRebootAtScheduledTime -Type DWord
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AutoInstallMinorUpdates" -Value $AutoInstallMinorUpdates -Type DWord
 
-    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" -Name "RequirePlatformSecurityFeatures" -Value $CredentialGuardEnabled -Type DWord
+    # Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" -Name "RequirePlatformSecurityFeatures" -Value 1 -Type DWord
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard" -Name "LsaCfgFlags" -Value $CredentialGuardEnabled -Type DWord
 
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "fSingleSessionPerUser" -Value $RestrictSingleSession -Type DWord
 
