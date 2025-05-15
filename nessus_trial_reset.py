@@ -21,8 +21,8 @@ def get_mail():
 
 def generate_nessus_pro():
     data = {
-        "first_name": "cheems",
-        "last_name": "Singh",
+        "first_name": "tim",
+        "last_name": "cook",
         "email": get_mail(),
         "phone": random.randrange(0000000000, 9999999999, 10),
         "code": "",
@@ -30,7 +30,7 @@ def generate_nessus_pro():
         "region": "",
         "zip": "505474",
         "title": "security engineer",
-        "company": "secyrask",
+        "company": "openai",
         "consentOptIn": "true",
         "essentialsOptIn": "false",
         "pid": "",
