@@ -1,0 +1,79 @@
+CLOUDFLARE_API_TOKEN=""
+CLOUDFLARE_ZONE_ID=""
+RECORDS_TO_UPDATE="sub1.domain.com sub2.domain.com"
+
+UPTIME_KUMA_PUSH_URL=""
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# Function to send a failure notification to Uptime Kuma and exit.
+send_failure_notification() {
+    record_name="$1"
+    error_message="$2"
+    echo "ERROR for $record_name: $error_message"
+    curl -s -o /dev/null -X GET "${UPTIME_KUMA_PUSH_URL}?status=down&msg=${record_name}_error"
+    exit 1
+}
+
+# Get the current public IPv4 address once at the beginning of the script.
+# We explicitly use an IPv4-only service to prevent issues with IPv6.
+CURRENT_IP=$(curl -s https://ipv4.icanhazip.com)
+if [ -z "$CURRENT_IP" ]; then
+    send_failure_notification "Global" "Failed to get current public IP address."
+fi
+echo "Current public IP is: $CURRENT_IP"
+
+# Loop through each record in the list and update if necessary.
+for RECORD_NAME in $RECORDS_TO_UPDATE; do
+    echo "Processing record: $RECORD_NAME"
+
+    # Get the current DNS record details from Cloudflare using the record name.
+    # We now use standard shell tools (grep and cut) to parse the JSON.
+    DNS_RECORD_JSON=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records?name=$RECORD_NAME" \
+         -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+         -H "Content-Type: application/json")
+
+    # Check for Cloudflare API errors by searching for '"success":false'.
+    if echo "$DNS_RECORD_JSON" | grep -q '"success":false'; then
+        # Parse the error message using standard shell tools.
+        ERROR_MSG=$(echo "$DNS_RECORD_JSON" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+        send_failure_notification "$RECORD_NAME" "Cloudflare API Error: $ERROR_MSG"
+    fi
+
+    # Parse the DNS record ID from the JSON response.
+    DNS_RECORD_ID=$(echo "$DNS_RECORD_JSON" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    # Parse the DNS IP from the JSON response.
+    DNS_IP=$(echo "$DNS_RECORD_JSON" | grep -o '"content":"[^"]*"' | head -1 | cut -d'"' -f4)
+    
+    if [ -z "$DNS_RECORD_ID" ] || [ -z "$DNS_IP" ]; then
+        send_failure_notification "$RECORD_NAME" "Failed to find or parse DNS record details for '$RECORD_NAME'."
+    fi
+    echo "Current DNS record IP for $RECORD_NAME is: $DNS_IP"
+
+    # Compare the IPs
+    if [ "$CURRENT_IP" = "$DNS_IP" ]; then
+        echo "IP addresses match. No update needed for $RECORD_NAME."
+        # Send a success notification to Uptime Kuma with a "no change" message
+        curl -s -o /dev/null -X GET "${UPTIME_KUMA_PUSH_URL}?status=up&msg=${RECORD_NAME}_no_update_needed"
+    else
+        echo "IP addresses differ. Updating Cloudflare DNS record for $RECORD_NAME."
+        
+        # Update the Cloudflare DNS record.
+        UPDATE_RESPONSE=$(curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records/$DNS_RECORD_ID" \
+             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+             -H "Content-Type: application/json" \
+             --data "{\"type\":\"A\",\"name\":\"$RECORD_NAME\",\"content\":\"$CURRENT_IP\",\"ttl\":1,\"proxied\":false}")
+
+        # Check if the update was successful.
+        if echo "$UPDATE_RESPONSE" | grep -q '"success":false'; then
+            # Parse the error message using standard shell tools.
+            ERROR_MSG=$(echo "$UPDATE_RESPONSE" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+            send_failure_notification "$RECORD_NAME" "Cloudflare API Update Error: $ERROR_MSG"
+        else
+            echo "Cloudflare DDNS record for $RECORD_NAME updated successfully to $CURRENT_IP."
+            # Send a success notification to Uptime Kuma.
+            curl -s -o /dev/null -X GET "${UPTIME_KUMA_PUSH_URL}?status=up&msg=${RECORD_NAME}_updated_successfully"
+        fi
+    fi
+done
