@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Cloudflare API details
 CLOUDFLARE_API_TOKEN=""
 CLOUDFLARE_ZONE_ID=""
